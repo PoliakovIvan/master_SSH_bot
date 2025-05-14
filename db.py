@@ -4,7 +4,7 @@ from sqlalchemy import select, delete
 from sqlmodel import SQLModel
 import os
 from dotenv import load_dotenv
-from models import User, Project
+from models import User, Project, UserProjectLink
 from contextlib import asynccontextmanager
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -43,3 +43,17 @@ async def create_project(session: AsyncSession, name: str, ip: str = None):
     await session.commit()
     await session.refresh(project)
     return project
+
+async def get_all_projects(session: AsyncSession):
+    stmt = select(Project)
+    result = await session.execute(stmt)
+    project = result.scalars().all()
+
+    return project
+
+async def connect_user_to_project(async_session: AsyncSession, user_id: int, project_id: int):
+    async with async_session.begin():
+        link = UserProjectLink(user_id=user_id, project_id=project_id)
+        async_session.add(link)
+
+    

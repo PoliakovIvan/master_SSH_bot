@@ -15,6 +15,9 @@ class CreateProjectStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_ip = State()
 
+class ConnectUserToProject(StatesGroup):
+    choosing_project = State()
+    choosing_user = State()
 # /start
 async def tg_start(message: Message):
     await message.answer("""
@@ -33,9 +36,9 @@ async def tg_create_user(message: Message, state: FSMContext):
     await state.set_state(CreateUserStates.waiting_for_name)
 
 async def process_name(message: Message, state: FSMContext):
-    await state.update_data(name=message.text.strip())
+    await state.update_data(name=message.text.strip()) 
     await message.answer("Enter ssh:")
-    await state.set_state(CreateUserStates.waiting_for_ssh)
+    await state.set_state(CreateUserStates.waiting_for_ssh) 
 
 async def process_ssh(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -105,18 +108,79 @@ async def process_project_ip(message: Message, state: FSMContext):
     
     await state.clear()
 
-# hwndlers
+async def tg_select_user(message: Message, state: FSMContext):
+    async with AsyncSessionLocal() as session:
+        users = await get_all_users(session)
+        if not users:
+            await message.answer("User list is empty. To create new user, click /create_user.")
+            return
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[  # кнопки для пользователей
+                [InlineKeyboardButton(text=user.name, callback_data=f"select_user:{user.id}")]
+                for user in users
+            ]
+        )
+        await message.answer("Choose user:", reply_markup=keyboard)
+        await state.set_state(ConnectUserToProject.choosing_user)
+
+async def tg_select_project(callback: CallbackQuery, state: FSMContext):  # Используем CallbackQuery
+    user_id = int(callback.data.split(":")[1])  # Получаем user_id из callback_data
+    await state.update_data(user_id=user_id)  # Сохраняем user_id в состояние
+    async with AsyncSessionLocal() as session:
+        projects = await get_all_projects(session)
+
+    if not projects:
+        await callback.message.edit_text("No projects.")
+        return
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[  # кнопки для проектов
+            [InlineKeyboardButton(text=p.name, callback_data=f"select_project:{p.id}")]
+            for p in projects
+        ]
+    )
+
+    await callback.message.edit_text("Choose project:", reply_markup=keyboard)
+    await state.set_state(ConnectUserToProject.choosing_project)
+
+async def on_project_selected(callback: CallbackQuery, state: FSMContext):
+    async with AsyncSessionLocal() as session:
+        try:
+            project_id = int(callback.data.split(":")[1])  # Разделяем строку по двоеточию и извлекаем проект
+        except (IndexError, ValueError):
+            await callback.message.edit_text("Error: invalid project selection.")
+            await state.clear()
+            return
+        
+        data = await state.get_data()
+        user_id = data.get("user_id")  
+        print(user_id)
+
+        if not user_id:
+            await callback.message.edit_text("Error: user not selected.")
+            await state.clear()
+            return
+
+        await connect_user_to_project(session, user_id, project_id)  # Подключаем пользователя к проекту
+        await callback.message.edit_text(f"User {user_id} connected to project {project_id}.")
+        await state.clear()
+
+# Регистрация обработчиков
 def register_handlers(dp: Dispatcher):
     dp.message.register(tg_start, Command("start"))
     dp.message.register(tg_create_user, Command("create_user"))
     dp.message.register(tg_delete_user, Command("delete_user"))
     dp.message.register(tg_create_project, Command("create_project"))
+    dp.message.register(tg_select_user, Command("connect_user"))
 
     dp.message.register(process_name, StateFilter(CreateUserStates.waiting_for_name))
     dp.message.register(process_ssh, StateFilter(CreateUserStates.waiting_for_ssh))
     dp.message.register(process_project_name, StateFilter(CreateProjectStates.waiting_for_name))
     dp.message.register(process_project_ip, StateFilter(CreateProjectStates.waiting_for_ip))
 
+    # Обработчики для callback_query
     dp.callback_query.register(delete_user_callback, F.data.startswith("delete_user:"))
+    dp.callback_query.register(tg_select_project, StateFilter(ConnectUserToProject.choosing_user), F.data.startswith("select_user:"))
+    dp.callback_query.register(on_project_selected, StateFilter(ConnectUserToProject.choosing_project), F.data.startswith("select_project:"))
 
 
