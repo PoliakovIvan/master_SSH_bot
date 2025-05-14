@@ -115,7 +115,7 @@ async def tg_select_user(message: Message, state: FSMContext):
             await message.answer("User list is empty. To create new user, click /create_user.")
             return
         keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[  # кнопки для пользователей
+            inline_keyboard=[  
                 [InlineKeyboardButton(text=user.name, callback_data=f"select_user:{user.id}")]
                 for user in users
             ]
@@ -123,9 +123,9 @@ async def tg_select_user(message: Message, state: FSMContext):
         await message.answer("Choose user:", reply_markup=keyboard)
         await state.set_state(ConnectUserToProject.choosing_user)
 
-async def tg_select_project(callback: CallbackQuery, state: FSMContext):  # Используем CallbackQuery
-    user_id = int(callback.data.split(":")[1])  # Получаем user_id из callback_data
-    await state.update_data(user_id=user_id)  # Сохраняем user_id в состояние
+async def tg_select_project(callback: CallbackQuery, state: FSMContext): 
+    user_id = int(callback.data.split(":")[1]) 
+    await state.update_data(user_id=user_id) 
     async with AsyncSessionLocal() as session:
         projects = await get_all_projects(session)
 
@@ -134,7 +134,7 @@ async def tg_select_project(callback: CallbackQuery, state: FSMContext):  # Ис
         return
 
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[  # кнопки для проектов
+        inline_keyboard=[ 
             [InlineKeyboardButton(text=p.name, callback_data=f"select_project:{p.id}")]
             for p in projects
         ]
@@ -146,7 +146,7 @@ async def tg_select_project(callback: CallbackQuery, state: FSMContext):  # Ис
 async def on_project_selected(callback: CallbackQuery, state: FSMContext):
     async with AsyncSessionLocal() as session:
         try:
-            project_id = int(callback.data.split(":")[1])  # Разделяем строку по двоеточию и извлекаем проект
+            project_id = int(callback.data.split(":")[1]) 
         except (IndexError, ValueError):
             await callback.message.edit_text("Error: invalid project selection.")
             await state.clear()
@@ -161,11 +161,11 @@ async def on_project_selected(callback: CallbackQuery, state: FSMContext):
             await state.clear()
             return
 
-        await connect_user_to_project(session, user_id, project_id)  # Подключаем пользователя к проекту
+        await connect_user_to_project(session, user_id, project_id) 
         await callback.message.edit_text(f"User {user_id} connected to project {project_id}.")
         await state.clear()
 
-# Регистрация обработчиков
+
 def register_handlers(dp: Dispatcher):
     dp.message.register(tg_start, Command("start"))
     dp.message.register(tg_create_user, Command("create_user"))
@@ -178,7 +178,7 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(process_project_name, StateFilter(CreateProjectStates.waiting_for_name))
     dp.message.register(process_project_ip, StateFilter(CreateProjectStates.waiting_for_ip))
 
-    # Обработчики для callback_query
+
     dp.callback_query.register(delete_user_callback, F.data.startswith("delete_user:"))
     dp.callback_query.register(tg_select_project, StateFilter(ConnectUserToProject.choosing_user), F.data.startswith("select_user:"))
     dp.callback_query.register(on_project_selected, StateFilter(ConnectUserToProject.choosing_project), F.data.startswith("select_project:"))
