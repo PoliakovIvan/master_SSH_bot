@@ -14,7 +14,7 @@ class User(SQLModel, table=True):
     projects: list["Project"] = Relationship(back_populates="users", link_model=UserProjectLink)
 
 
-class Project(SQLModel, table=True):
+class Project(SQLModel, table=True):# add password functionality
     id: int = Field(default=None, primary_key=True)
     name: str
     ip: str

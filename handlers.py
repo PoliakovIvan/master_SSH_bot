@@ -6,6 +6,7 @@ from aiogram.fsm.state import State, StatesGroup  # Імпортуємо StatesG
 from telegram import CallbackQuery
 from db import *
 from models import User, Project
+from ssh_tool import connect_user
 
 class CreateUserStates(StatesGroup):
     waiting_for_name = State()
@@ -108,6 +109,7 @@ async def process_project_ip(message: Message, state: FSMContext):
     
     await state.clear()
 
+# /connect_user
 async def tg_select_user(message: Message, state: FSMContext):
     async with AsyncSessionLocal() as session:
         users = await get_all_users(session)
@@ -163,7 +165,9 @@ async def on_project_selected(callback: CallbackQuery, state: FSMContext):
 
         await connect_user_to_project(session, user_id, project_id) 
         await callback.message.edit_text(f"User {user_id} connected to project {project_id}.")
+        await connect_user(user_id, project_id)
         await state.clear()
+
 
 
 def register_handlers(dp: Dispatcher):
