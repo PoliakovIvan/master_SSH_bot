@@ -28,6 +28,7 @@ async def create_user(session: AsyncSession, name: str, pub_ssh: str = None):
     return user
 
 async def delete_user(session: AsyncSession, id: str):
+    await session.execute(delete(UserProjectLink).where(UserProjectLink.user_id == id))
     stmt = delete(User).where(User.id == id)
     await session.execute(stmt)
     await session.commit()
